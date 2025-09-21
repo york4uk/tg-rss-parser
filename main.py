@@ -11,14 +11,16 @@ API_ID = os.getenv("API_ID")
 API_HASH = os.getenv("API_HASH")
 SESSION_STRING = os.getenv("SESSION_STRING")
 TARGET_CHAT_ID = int(os.getenv("TARGET_CHAT_ID"))
+OWNER_ID = int(os.getenv("OWNER_ID"))  # ✅ Добавлено: ID твоего аккаунта
 CHANNELS_LIST = os.getenv("CHANNELS_LIST", "")
 CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", 300))
-SEARCH_INTERVAL = int(os.getenv("SEARCH_INTERVAL", 3600))  # поиск новых каналов каждый час
+SEARCH_INTERVAL = int(os.getenv("SEARCH_INTERVAL", 3600))
 
 # 🔑 Ключевые слова для фильтрации постов
 KEYWORDS = {
-    "розыгрыш", "дарим", "прдарим" "giveaway", "конкурс", "выиграй", "подарок",
-    "разыгрываем", "участвуй", "участвую", "подарки"
+    "розыгрыш", "дарим", "giveaway", "конкурс", "выиграй", "подарок",
+    "разыгрываем", "приз", "лот", "акция", "бесплатно", "участвуй",
+    "репост", "подписка", "промо", "лотерея", "win", "подарки"
 }
 
 # 🔍 Ключевые слова для поиска каналов
@@ -27,7 +29,7 @@ SEARCH_QUERIES = ["розыгрыш", "giveaway", "дарим", "конкурс"
 # 🤖 Инициализация клиента
 app = Client("universal_parser", api_id=API_ID, api_hash=API_HASH, session_string=SESSION_STRING)
 
-# 🧠 Глобальные переменные для отслеживания
+# 🧠 Глобальные переменные
 found_channels = set()
 if CHANNELS_LIST:
     found_channels.update(ch.strip() for ch in CHANNELS_LIST.split(",") if ch.strip())
@@ -76,6 +78,12 @@ async def get_group_messages(client: Client, chat_id: int, minutes_ago: int = 15
         if message_utc < cutoff_time:
             break
         if message.text:
+            # ✅ Игнорируем сообщения от самого бота
+            if message.from_user and message.from_user.id == OWNER_ID:
+                continue
+            # ✅ Игнорируем сообщения из целевой группы (куда бот отправляет уведомления)
+            if message.chat.id == TARGET_CHAT_ID:
+                continue
             messages.append({
                 "text": message.text,
                 "link": f"tg://openmessage?chat_id={chat_id}&message_id={message.id}",
@@ -100,7 +108,6 @@ async def search_new_channels(client: Client):
         except Exception as e:
             print(f"    Ошибка поиска по '{query}': {e}")
 
-    # Добавляем только новые каналы
     added = new_channels - found_channels
     if added:
         print(f"  ✅ Добавлено {len(added)} новых каналов: {', '.join(added)}")
@@ -111,7 +118,7 @@ async def search_new_channels(client: Client):
 # 🔄 Основной цикл парсинга
 async def main():
     await app.start()
-    print("🚀 Универсальный парсер с авто-поиском каналов запущен")
+    print("🚀 Универсальный парсер с защитой от зацикливания")
     print(f"⏱️  Проверка постов каждые {CHECK_INTERVAL} секунд")
     print(f"🔍 Поиск новых каналов каждые {SEARCH_INTERVAL} секунд")
 
@@ -126,7 +133,6 @@ async def main():
                 "type": dialog.chat.type.value
             })
 
-    # 🔍 DEBUG: Вывести все диалоги
     print(f"\n[DEBUG] Все диалоги (первые 20):")
     count = 0
     async for dialog in app.get_dialogs():
@@ -144,7 +150,6 @@ async def main():
         try:
             current_time = time.time()
 
-            # 🔍 Поиск новых каналов
             if current_time - last_search_time > SEARCH_INTERVAL:
                 await search_new_channels(app)
                 last_search_time = current_time
@@ -174,7 +179,7 @@ async def main():
                 except Exception as e:
                     print(f"[-] Ошибка при парсинге канала @{channel_username}: {e}")
 
-            # 2. Проверяем группы через историю сообщений
+            # 2. Проверяем группы
             for group in groups:
                 try:
                     messages = await get_group_messages(app, group["id"], minutes_ago=15)
