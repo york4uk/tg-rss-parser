@@ -101,7 +101,7 @@ async def search_new_channels(client: Client):
     for query in SEARCH_QUERIES:
         print(f"  Поиск по запросу: '{query}'")
         try:
-            async for chat in client.search_public_chat(query):
+            async for chat in client.search_public_chats(query):
                 if chat.type == "channel" and chat.username:
                     new_channels.add(chat.username.lower())
                     print(f"    → Найден канал: @{chat.username}")
@@ -209,6 +209,7 @@ async def main():
 
 if __name__ == "__main__":
     app.run(main())
+
 
 
 
