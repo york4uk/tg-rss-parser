@@ -2,7 +2,7 @@ import feedparser
 import asyncio
 import time
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone  # ✅ timezone добавлен
 from pyrogram import Client
 from pyrogram.types import Message
 
@@ -16,7 +16,7 @@ CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", 300))  # интервал пр�
 
 # 🔑 Ключевые слова для фильтрации
 KEYWORDS = {
-    "розыгрыш", "дарим", "подарим", "giveaway", "конкурс", "выиграй", "подарок",
+    "розыгрыш", "дарим", "giveaway", "конкурс", "выиграй", "подарок",
     "разыгрываем", "приз", "лот", "акция", "бесплатно", "участвуй",
     "репост", "подписка", "промо", "лотерея", "win", "подарки"
 }
@@ -39,10 +39,15 @@ def get_channel_posts(channel_username: str, minutes_ago: int = 15):
     url = f"https://t.me/s/{channel_username}"
     feed = feedparser.parse(url)
     posts = []
-    cutoff_time = datetime.utcnow() - timedelta(minutes=minutes_ago)
+    cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)  # ✅ Исправлено
 
     for entry in feed.entries:
-        pub_date = datetime(*entry.published_parsed[:6]) if hasattr(entry, 'published_parsed') else datetime.utcnow()
+        # Парсим дату с таймзоной
+        if hasattr(entry, 'published_parsed'):
+            pub_date = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
+        else:
+            pub_date = datetime.now(timezone.utc)
+
         if pub_date > cutoff_time:
             posts.append({
                 "title": entry.title if hasattr(entry, 'title') else "",
@@ -56,9 +61,9 @@ def get_channel_posts(channel_username: str, minutes_ago: int = 15):
 # 📥 Функция: получить последние сообщения из группы
 async def get_group_messages(client: Client, chat_id: int, minutes_ago: int = 15):
     messages = []
-    cutoff_time = datetime.now() - timedelta(minutes=minutes_ago)
+    cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)  # ✅ Исправлено
     async for message in client.get_chat_history(chat_id, limit=20):
-        if message.date < cutoff_time:
+        if message.date.replace(tzinfo=timezone.utc) < cutoff_time:
             break
         if message.text:
             messages.append({
@@ -85,7 +90,17 @@ async def main():
                 "title": dialog.chat.title,
                 "type": dialog.chat.type
             })
-    print(f"[+] Найдено {len(groups)} групп")
+
+    # 🔍 DEBUG: Вывести все диалоги (для диагностики)
+    print(f"\n[DEBUG] Все диалоги (первые 20):")
+    count = 0
+    async for dialog in app.get_dialogs():
+        if count >= 20:
+            break
+        print(f"  - [{dialog.chat.type}] {dialog.chat.title or 'Без названия'} | ID: {dialog.chat.id}")
+        count += 1
+
+    print(f"\n[+] Найдено {len(groups)} групп")
 
     # Получаем список каналов
     channels = []
@@ -152,5 +167,4 @@ async def main():
 
 if __name__ == "__main__":
     app.run(main())
-
 
