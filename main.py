@@ -63,7 +63,8 @@ async def get_group_messages(client: Client, chat_id: int, minutes_ago: int = 15
     messages = []
     cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)  # ✅ Исправлено
     async for message in client.get_chat_history(chat_id, limit=20):
-        if message.date.replace(tzinfo=timezone.utc) < cutoff_time:
+       message_utc = message.date.replace(tzinfo=timezone.utc) if message.date.tzinfo is None else message.date
+if message_utc < cutoff_time:
             break
         if message.text:
             messages.append({
@@ -84,7 +85,7 @@ async def main():
     print("[+] Получаем список групп...")
     groups = []
     async for dialog in app.get_dialogs():
-        if dialog.chat.type in ["group", "supergroup"]:
+        if dialog.chat.type.value in ["group", "supergroup"]:
             groups.append({
                 "id": dialog.chat.id,
                 "title": dialog.chat.title,
@@ -167,4 +168,5 @@ async def main():
 
 if __name__ == "__main__":
     app.run(main())
+
 
