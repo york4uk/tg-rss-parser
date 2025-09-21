@@ -2,7 +2,7 @@ import feedparser
 import asyncio
 import time
 import os
-from datetime import datetime, timedelta, timezone  # ✅ timezone добавлен
+from datetime import datetime, timedelta, timezone
 from pyrogram import Client
 from pyrogram.types import Message
 
@@ -39,10 +39,9 @@ def get_channel_posts(channel_username: str, minutes_ago: int = 15):
     url = f"https://t.me/s/{channel_username}"
     feed = feedparser.parse(url)
     posts = []
-    cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)  # ✅ Исправлено
+    cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)
 
     for entry in feed.entries:
-        # Парсим дату с таймзоной
         if hasattr(entry, 'published_parsed'):
             pub_date = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
         else:
@@ -61,10 +60,11 @@ def get_channel_posts(channel_username: str, minutes_ago: int = 15):
 # 📥 Функция: получить последние сообщения из группы
 async def get_group_messages(client: Client, chat_id: int, minutes_ago: int = 15):
     messages = []
-    cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)  # ✅ Исправлено
+    cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)
     async for message in client.get_chat_history(chat_id, limit=20):
-       message_utc = message.date.replace(tzinfo=timezone.utc) if message.date.tzinfo is None else message.date
-if message_utc < cutoff_time:
+        # Приводим дату сообщения к UTC
+        message_utc = message.date.replace(tzinfo=timezone.utc) if message.date.tzinfo is None else message.date
+        if message_utc < cutoff_time:
             break
         if message.text:
             messages.append({
@@ -85,11 +85,11 @@ async def main():
     print("[+] Получаем список групп...")
     groups = []
     async for dialog in app.get_dialogs():
-        if dialog.chat.type.value in ["group", "supergroup"]:
+        if dialog.chat.type.value in ["group", "supergroup"]:  # ✅ ИСПРАВЛЕНО: .value
             groups.append({
                 "id": dialog.chat.id,
                 "title": dialog.chat.title,
-                "type": dialog.chat.type
+                "type": dialog.chat.type.value
             })
 
     # 🔍 DEBUG: Вывести все диалоги (для диагностики)
@@ -98,7 +98,7 @@ async def main():
     async for dialog in app.get_dialogs():
         if count >= 20:
             break
-        print(f"  - [{dialog.chat.type}] {dialog.chat.title or 'Без названия'} | ID: {dialog.chat.id}")
+        print(f"  - [{dialog.chat.type.value}] {dialog.chat.title or 'Без названия'} | ID: {dialog.chat.id}")
         count += 1
 
     print(f"\n[+] Найдено {len(groups)} групп")
@@ -168,5 +168,6 @@ async def main():
 
 if __name__ == "__main__":
     app.run(main())
+
 
 
